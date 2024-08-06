@@ -69,7 +69,10 @@ pipeline {
                         withCredentials([usernamePassword(credentialsId: 'docker-creds', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
                             sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
                         }
-                        sh 'docker push ${DOCKER_IMAGE}'
+                        sh """
+                        docker tag ${DOCKER_IMAGE} manasg1124/kubectl-git-image:my-kubectl-img-v1
+                        docker push manasg1124/kubectl-git-image:my-kubectl-img-v1
+                        """
                     }
                 }
             }
