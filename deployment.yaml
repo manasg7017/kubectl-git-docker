@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubectl-git-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubectl-git
+  template:
+    metadata:
+      labels:
+        app: kubectl-git
+    spec:
+      containers:
+      - name: kubectl-git-container
+        image: manasg1124/kubectl-git-image
+        ports:
+        - containerPort: 80
