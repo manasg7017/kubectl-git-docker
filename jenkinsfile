@@ -1,0 +1,87 @@
+pipeline {
+    agent {
+        kubernetes {
+            label 'docker'
+            defaultContainer 'jnlp'
+            yaml """
+            apiVersion: v1
+            kind: Pod
+            metadata:
+                labels:
+                    some-label: some-value
+            spec:
+                serviceAccount: jenkins  # Specify the service account here
+                containers:
+                - name: docker
+                  image: docker:19.03.12
+                  command:
+                  - cat
+                  tty: true
+                  volumeMounts:
+                  - mountPath: /var/run/docker.sock
+                    name: docker-sock
+                - name: jnlp
+                  image: jenkins/inbound-agent:latest
+                  args: ['\$(JENKINS_SECRET)', '\$(JENKINS_NAME)']
+                - name: kubectl
+                  image: manasg1124/kubectl-git-image
+                  command:
+                  - cat
+                  tty: true
+                  volumeMounts:
+                  - mountPath: /home/jenkins/agent
+                    name: workspace-volume
+                volumes:
+                - name: docker-sock
+                  hostPath:
+                    path: /var/run/docker.sock
+                - emptyDir:
+                    medium: ""
+                  name: workspace-volume
+            """
+        }
+    }
+
+    environment {
+        DOCKER_IMAGE = 'manasg1124/kubectl-git-image'
+        GIT_REPO = 'https://github.com/manasg7017/kubectl-git-docker.git'
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                script {
+                    git branch: 'master', url: "${GIT_REPO}", credentialsId: 'github-creds'
+                }
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                container('docker') {
+                    sh 'docker build -t ${DOCKER_IMAGE} .'
+                }
+            }
+        }
+        stage('Push Docker Image') {
+            steps {
+                container('docker') {
+                    script {
+                        withCredentials([usernamePassword(credentialsId: 'docker-creds', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                            sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
+                        }
+                        sh 'docker push ${DOCKER_IMAGE}'
+                    }
+                }
+            }
+        }
+        stage('Deploy to Kubernetes') {
+            steps {
+                container('kubectl') {
+                    script {
+                        sh 'kubectl apply -f deployment.yaml'
+                    }
+                }
+            }
+        }
+    }
+}
